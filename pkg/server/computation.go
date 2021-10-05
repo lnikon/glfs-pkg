@@ -2,6 +2,8 @@ package server
 
 import (
 	"fmt"
+
+	glkube "github.com/lnikon/glfs-pkg/pkg/kube"
 )
 
 type Computation struct {
@@ -16,7 +18,7 @@ func (c *ComputationService) GetAllComputations() []Computation {
 }
 
 func (c *ComputationService) PostComputation(request *PostComputationRequest) PostComputationResponse {
-	// glkube.CreateDeployment()
 	fmt.Printf("Post computation request called for %s\n", request.Algorithm)
+	glkube.CreateDeployment()
 	return PostComputationResponse{}
 }
