@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"path/filepath"
 
 	// "k8s.io/apimachinery/pkg/api/errors"
@@ -27,23 +28,24 @@ func GetPodsCount() int {
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err.Error())
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err.Error())
 	}
 
 	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err.Error())
 	}
 
 	return len(pods.Items)
 }
 
 func CreateDeployment() {
+	fmt.Print("Hellllo!")
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "")
@@ -54,12 +56,12 @@ func CreateDeployment() {
 
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	deploymentClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
@@ -102,7 +104,7 @@ func CreateDeployment() {
 	fmt.Println("Creating deployment...")
 	result, err := deploymentClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	fmt.Printf("Created deployment %q.\n", result.GetObjectMeta().GetName())

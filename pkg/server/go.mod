@@ -7,6 +7,8 @@ require (
 	github.com/lnikon/glfs-pkg/pkg/kube v0.0.0-20211005074206-76fd7d7e7fac
 )
 
+replace github.com/lnikon/glfs-pkg/pkg/kube => ../kube
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-kit/log v0.2.0 // indirect
