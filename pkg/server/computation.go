@@ -19,7 +19,7 @@ type Computation struct {
 }
 
 type ComputationService struct {
-	computations []Computation `json:"computations"`
+	computations []Computation
 }
 
 func NewComputationService() (*ComputationService, error) {
@@ -56,9 +56,10 @@ func (c *ComputationService) GetAllComputations() []Computation {
 
 func (c *ComputationService) PostComputation(algorithm Algorithm) (Computation, error) {
 	computation := Computation{Algorithm: algorithm, Name: c.generateComputationName()}
-	c.computations = append(c.computations, computation)
 	if err := glkube.CreateDeployment(computation.Name); err != nil {
 		return computation, err
 	}
+
+	c.computations = append(c.computations, computation)
 	return computation, nil
 }
