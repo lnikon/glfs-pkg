@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/go-kit/kit v0.12.0
-	github.com/lnikon/glfs-pkg/pkg/kube v0.0.0-20211005070856-09a9e4d36c6c
+	github.com/lnikon/glfs-pkg/pkg/kube v0.0.0-20211005074206-76fd7d7e7fac
 )
 
 require (
