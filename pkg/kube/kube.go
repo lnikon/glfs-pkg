@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
@@ -29,11 +30,9 @@ func init() {
 }
 
 func createDeploymentClient() *v1.DeploymentInterface {
-	flag.Parse()
-	kubeconfig := flag.Lookup("kubeconfig").Value.(flag.Getter).Get().(string)
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
