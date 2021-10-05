@@ -12,10 +12,10 @@ type algorithmRequest struct {
 }
 
 type algorithmResponse struct {
-	Algorithm []Algorithm `json:"algorithm"`
+	Algorithm []Algorithm
 }
 
-func MakeAlgorithmEndpoint(svc AlgorithmService) endpoint.Endpoint {
+func MakeAlgorithmEndpoint(svc *AlgorithmService) endpoint.Endpoint {
 	return func(_ context.Context, request interface{}) (interface{}, error) {
 		a := svc.Algorithm()
 		return algorithmResponse{a}, nil
@@ -30,13 +30,12 @@ type GetAllComputationsRequest struct {
 }
 
 type GetAllComputationsResponse struct {
-	computations []Computation
+	Computations []Computation
 }
 
-func MakeGetAllComputationsEndpoint(svc ComputationService) endpoint.Endpoint {
+func MakeGetAllComputationsEndpoint(svc *ComputationService) endpoint.Endpoint {
 	return func(_ context.Context, request interface{}) (interface{}, error) {
-		s := svc.GetAllComputations()
-		return GetAllComputationsResponse{s}, nil
+		return GetAllComputationsResponse{Computations: svc.GetAllComputations()}, nil
 	}
 }
 
@@ -56,11 +55,10 @@ type PostComputationRequest struct {
 type PostComputationResponse struct {
 }
 
-func MakePostComputationEndpoint(svc ComputationService) endpoint.Endpoint {
+func MakePostComputationEndpoint(svc *ComputationService) endpoint.Endpoint {
 	return func(_ context.Context, request interface{}) (interface{}, error) {
 		req := request.(PostComputationRequest)
-		s := svc.PostComputation(&req)
-		return s, nil
+		return svc.PostComputation(req.Algorithm)
 	}
 }
 

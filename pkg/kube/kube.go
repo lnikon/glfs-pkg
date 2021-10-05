@@ -13,9 +13,37 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
+
+func init() {
+	if flag.Lookup("kubeconfig") == nil {
+		if home := homedir.HomeDir(); home != "" {
+			flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "")
+		} else {
+			flag.String("kubeconfig", "", "")
+		}
+	}
+}
+
+func createDeploymentClient() *v1.DeploymentInterface {
+	flag.Parse()
+	kubeconfig := flag.Lookup("kubeconfig").Value.(flag.Getter).Get().(string)
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	deploymentClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
+	return &deploymentClient
+}
 
 func GetPodsCount() int {
 	var kubeconfig *string
@@ -44,42 +72,23 @@ func GetPodsCount() int {
 	return len(pods.Items)
 }
 
-func CreateDeployment() {
-	fmt.Print("Hellllo!")
-	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "")
-	}
-	flag.Parse()
-
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	deploymentClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
+func CreateDeployment(name string) error {
+	deploymentClient := *createDeploymentClient()
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "demo-deployment",
+			Name: name,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "demo",
+					"app": name,
 				},
 			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": "demo",
+						"app": name,
 					},
 				},
 				Spec: apiv1.PodSpec{
@@ -101,13 +110,36 @@ func CreateDeployment() {
 		},
 	}
 
-	fmt.Println("Creating deployment...")
+	fmt.Println("Kube: Creating deployment...")
 	result, err := deploymentClient.Create(context.TODO(), deployment, metav1.CreateOptions{})
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 
-	fmt.Printf("Created deployment %q.\n", result.GetObjectMeta().GetName())
+	fmt.Printf("Kube: Created deployment %q.\n", result.GetObjectMeta().GetName())
+	return nil
+}
+
+func GetDeployment(name string) *appsv1.Deployment {
+	deploymentClient := *createDeploymentClient()
+	deployement, err := deploymentClient.Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+
+	return deployement
+}
+
+func GetAllDeployments() *appsv1.DeploymentList {
+	deploymentClient := *createDeploymentClient()
+	deploymentList, err := deploymentClient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil
+	}
+
+	return deploymentList
 }
 
 func int32Ptr(i int32) *int32 { return &i }

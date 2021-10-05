@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/go-kit/kit v0.12.0
-	github.com/lnikon/glfs-pkg/pkg/kube v0.0.0-20211005074206-76fd7d7e7fac
+	github.com/lnikon/glfs-pkg/pkg/kube v0.0.0-20211005075311-7f984f64cd01
 )
 
 replace github.com/lnikon/glfs-pkg/pkg/kube => ../kube
