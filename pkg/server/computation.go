@@ -19,6 +19,7 @@ func (c *ComputationService) GetAllComputations() []Computation {
 
 func (c *ComputationService) PostComputation(request *PostComputationRequest) PostComputationResponse {
 	fmt.Printf("Post computation request called for %s\n", request.Algorithm)
+
 	glkube.CreateDeployment()
 	return PostComputationResponse{}
 }
