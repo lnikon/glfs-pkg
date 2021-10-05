@@ -1,4 +1,4 @@
-module github.com/lnikon/glfs-pkg/server
+module github.com/lnikon/glfs-pkg/pkg/server
 
 go 1.17
 
