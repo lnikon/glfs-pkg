@@ -53,12 +53,18 @@ type PostComputationRequest struct {
 }
 
 type PostComputationResponse struct {
+	Computation Computation
 }
 
 func MakePostComputationEndpoint(svc *ComputationService) endpoint.Endpoint {
 	return func(_ context.Context, request interface{}) (interface{}, error) {
 		req := request.(PostComputationRequest)
-		return svc.PostComputation(req.Algorithm)
+		computation, err := svc.PostComputation(req.Algorithm)
+		if err != nil {
+			return nil, err
+		}
+
+		return PostComputationResponse{Computation: computation}, nil
 	}
 }
 
