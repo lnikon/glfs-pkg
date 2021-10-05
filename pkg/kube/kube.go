@@ -65,13 +65,13 @@ func CreateDeployment() {
 	deploymentClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "upcxx-deployment",
+			Name: "demo-deployment",
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": "upcxx",
+					"app": "demo",
 				},
 			},
 			Template: apiv1.PodTemplateSpec{
@@ -83,7 +83,7 @@ func CreateDeployment() {
 				Spec: apiv1.PodSpec{
 					Containers: []apiv1.Container{
 						{
-							Name:  "nginx",
+							Name:  "web",
 							Image: "nginx:1.12",
 							Ports: []apiv1.ContainerPort{
 								{
