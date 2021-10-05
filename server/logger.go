@@ -6,6 +6,7 @@ import (
 	log "github.com/go-kit/kit/log"
 )
 
+
 type loggingMiddleware struct {
 	logger log.Logger
 	next   StringService
