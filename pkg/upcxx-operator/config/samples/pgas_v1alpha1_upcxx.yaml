@@ -1,0 +1,8 @@
+apiVersion: pgas.github.com/v1alpha1
+kind: UPCXX
+metadata:
+  name: upcxx-sample
+spec:
+  # Add fields here
+  name: upcxx-1
+  workersCount: 7
