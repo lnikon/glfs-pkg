@@ -16,8 +16,6 @@ import (
 	v1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
-
-	pgasv1betav1 "github.com/lnikon/glfs-pkg/pkg/upcxx-operator"
 )
 
 func init() {
