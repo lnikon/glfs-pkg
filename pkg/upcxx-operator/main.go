@@ -79,8 +79,10 @@ func main() {
 	}
 
 	if err = (&controllers.UPCXXReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("upcxx-controller"),
+		Log:      ctrl.Log.WithName("controllers").WithName("UPCXX"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "UPCXX")
 		os.Exit(1)

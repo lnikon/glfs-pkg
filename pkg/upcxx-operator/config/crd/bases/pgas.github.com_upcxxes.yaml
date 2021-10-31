@@ -36,16 +36,16 @@ spec:
           spec:
             description: UPCXXSpec defines the desired state of UPCXX
             properties:
-              name:
+              statefulSetName:
                 description: Name of the current UPCXX job deployment
                 type: string
-              workersCount:
+              workerCount:
                 description: Count of worker pods
                 format: int32
                 type: integer
             required:
-            - name
-            - workersCount
+            - statefulSetName
+            - workerCount
             type: object
           status:
             description: UPCXXStatus defines the observed state of UPCXX

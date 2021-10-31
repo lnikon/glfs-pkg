@@ -4,5 +4,5 @@ metadata:
   name: upcxx-sample
 spec:
   # Add fields here
-  name: upcxx-1
-  workersCount: 7
+  statefulSetName: upcxx-1
+  workerCount: 7

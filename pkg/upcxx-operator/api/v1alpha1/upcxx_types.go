@@ -29,10 +29,10 @@ type UPCXXSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Name of the current UPCXX job deployment
-	Name string `json:"name"`
+	StatefulSetName string `json:"statefulSetName"`
 
 	// Count of worker pods
-	WorkersCount int32 `json:"workersCount"`
+	WorkerCount int32 `json:"workerCount"`
 }
 
 // UPCXXStatus defines the observed state of UPCXX
