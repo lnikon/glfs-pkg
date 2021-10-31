@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	pgasv1alpha1 "github.com/lnikon/upcxx-operator/api/v1alpha1"
+	pgasv1alpha1 "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
 	"github.com/lnikon/upcxx-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )

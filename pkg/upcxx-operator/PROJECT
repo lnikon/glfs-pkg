@@ -14,6 +14,6 @@ resources:
   domain: github.com
   group: pgas
   kind: UPCXX
-  path: github.com/lnikon/upcxx-operator/api/v1alpha1
+  path: github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1
   version: v1alpha1
 version: "3"
