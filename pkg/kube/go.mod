@@ -3,10 +3,13 @@ module github.com/lnikon/glfs-pkg/pkg/kube
 go 1.17
 
 require (
+	github.com/lnikon/glfs-pkg/pkg/upcxx-operator v0.0.0-00010101000000-000000000000
 	k8s.io/api v0.22.3
 	k8s.io/apimachinery v0.22.3
 	k8s.io/client-go v0.22.3
 )
+
+replace github.com/lnikon/glfs-pkg/pkg/upcxx-operator => ../upcxx-operator
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -34,6 +37,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	k8s.io/klog/v2 v2.30.0 // indirect
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b // indirect
+	sigs.k8s.io/controller-runtime v0.10.2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )

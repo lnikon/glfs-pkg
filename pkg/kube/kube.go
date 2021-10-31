@@ -16,6 +16,8 @@ import (
 	v1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+
+	upcxxv1alpha1 "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
 )
 
 func init() {
@@ -73,6 +75,7 @@ func GetPodsCount() int {
 }
 
 func CreateDeployment(name string) error {
+	upcxxSpec := upcxxv1alpha1.UPCXXSpec{}
 	deploymentClient := *createDeploymentClient()
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
