@@ -5,7 +5,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: upcxx-operator
-repo: github.com/lnikon/upcxx-operator
+repo: github.com/lnikon/glfs-pkg/pkg/upcxx-operator
 resources:
 - api:
     crdVersion: v1
