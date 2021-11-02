@@ -1,10 +1,7 @@
 package server
 
 import (
-	"errors"
 	"fmt"
-	"log"
-	"regexp"
 
 	glkube "github.com/lnikon/glfs-pkg/pkg/kube"
 )
@@ -25,23 +22,23 @@ type ComputationService struct {
 func NewComputationService() (*ComputationService, error) {
 	computationService := &ComputationService{}
 
-	deploymentsList := glkube.GetAllDeployments()
-	if deploymentsList == nil {
-		return nil, errors.New("unable to get all deployments")
-	}
+	// deploymentsList := glkube.GetAllDeployments()
+	// if deploymentsList == nil {
+	// 	return nil, errors.New("unable to get all deployments")
+	// }
 
-	computationDeploymentNameRegexp, err := regexp.Compile("(computation-[0-9]+)")
-	if err != nil {
-		log.Fatal("Unable to compile regexp")
-		return nil, errors.New("unable to compile computation name matching regexp")
-	}
+	// computationDeploymentNameRegexp, err := regexp.Compile("(computation-[0-9]+)")
+	// if err != nil {
+	// 	log.Fatal("Unable to compile regexp")
+	// 	return nil, errors.New("unable to compile computation name matching regexp")
+	// }
 
-	for _, deployment := range deploymentsList.Items {
-		name := deployment.ObjectMeta.Name
-		if computationDeploymentNameRegexp.MatchString(name) {
-			computationService.computations = append(computationService.computations, Computation{Algorithm: Kruskal, Name: name})
-		}
-	}
+	// for _, deployment := range deploymentsList.Items {
+	// 	name := deployment.ObjectMeta.Name
+	// 	if computationDeploymentNameRegexp.MatchString(name) {
+	// 		computationService.computations = append(computationService.computations, Computation{Algorithm: Kruskal, Name: name})
+	// 	}
+	// }
 
 	return computationService, nil
 }
@@ -51,6 +48,15 @@ func (c *ComputationService) generateComputationName() string {
 }
 
 func (c *ComputationService) GetAllComputations() []Computation {
+	upcxxList := glkube.GetAllDeployments()
+	var computations []Computation
+	for _, upcxx := range upcxxList.Items {
+		computations = append(computations, Computation{
+			Name:      upcxx.Spec.StatefulSetName,
+			Algorithm: "Prim",
+		})
+	}
+
 	return c.computations
 }
 

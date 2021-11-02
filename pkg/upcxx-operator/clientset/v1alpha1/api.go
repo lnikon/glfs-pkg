@@ -30,7 +30,7 @@ func NewForConfig(c *rest.Config) (*ExampleV1Alpha1Client, error) {
 	return &ExampleV1Alpha1Client{restClient: client}, nil
 }
 
-func (c *ExampleV1Alpha1Client) Projects(namespace string) UPCXXInterface {
+func (c *ExampleV1Alpha1Client) UPCXX(namespace string) UPCXXInterface {
 	return &UPCXXClient{
 		restClient: c.restClient,
 		ns:         namespace,

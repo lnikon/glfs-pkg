@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/lnikon/glfs-pkg/pkg/upcxx-operator v0.0.0-00010101000000-000000000000
 	k8s.io/api v0.22.3
+	k8s.io/apiextensions-apiserver v0.22.2
 	k8s.io/apimachinery v0.22.3
 	k8s.io/client-go v0.22.3
 )
