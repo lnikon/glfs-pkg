@@ -1,38 +1,59 @@
 package v1alpha1
 
 import (
+	"log"
+
 	"github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 )
 
-type ExampleV1Alpha1Interface interface {
-	Projects(namespace string) UPCXXInterface
+type UPCXXInterface interface {
+	List(opts metav1.ListOptions) (*v1alpha1.UPCXXList, error)
+	Get(string, metav1.GetOptions) (*v1alpha1.UPCXX, error)
 }
 
-type ExampleV1Alpha1Client struct {
+type UPCXXClient struct {
 	restClient rest.Interface
+	ns         string
 }
 
-func NewForConfig(c *rest.Config) (*ExampleV1Alpha1Client, error) {
+func NewForConfig(c *rest.Config) (*UPCXXClient, error) {
 	config := *c
-	config.ContentConfig.GroupVersion = &schema.GroupVersion{Group: v1alpha1.GroupVersion.Group, Version: v1alpha1.GroupVersion.Version}
+	config.ContentConfig.GroupVersion = &v1alpha1.GroupVersion
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	config.UserAgent = rest.DefaultKubernetesUserAgent()
+
+	log.Printf("config=%v", config)
 
 	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ExampleV1Alpha1Client{restClient: client}, nil
+	if client == nil {
+		log.Printf("REST client is nil")
+	}
+
+	log.Printf("UPCXX clientset successfully created!")
+
+	return &UPCXXClient{restClient: client}, nil
 }
 
-func (c *ExampleV1Alpha1Client) UPCXX(namespace string) UPCXXInterface {
-	return &UPCXXClient{
+func (c *UPCXXClient) UPCXX(namespace string) UPCXXInterface {
+	upcxxClient := &UPCXXClient{
 		restClient: c.restClient,
 		ns:         namespace,
 	}
+
+	log.Printf("UPCXX client successfully created!")
+	l, err := upcxxClient.List(metav1.ListOptions{})
+	if err != nil || l == nil {
+		log.Printf("l is nil")
+	} else {
+		log.Printf("%v", l)
+	}
+	return upcxxClient
 }

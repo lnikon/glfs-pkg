@@ -3,14 +3,15 @@ module github.com/lnikon/glfs-pkg/pkg/kube
 go 1.17
 
 require (
-	github.com/lnikon/glfs-pkg/pkg/upcxx-operator v0.0.0-00010101000000-000000000000
+	github.com/lnikon/glfs-pkg/pkg/upcxx-operator v0.0.0-20211102054123-0af260885377
 	k8s.io/api v0.22.3
-	k8s.io/apiextensions-apiserver v0.22.2
 	k8s.io/apimachinery v0.22.3
 	k8s.io/client-go v0.22.3
 )
 
-replace github.com/lnikon/glfs-pkg/pkg/upcxx-operator => ../upcxx-operator
+replace (
+        github.com/lnikon/glfs-pkg/pkg/upcxx-operator => ../upcxx-operator
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -25,9 +26,9 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.0.0-20211029224645-99673261e6eb // indirect
+	golang.org/x/net v0.0.0-20211101193420-4a448f8816b3 // indirect
 	golang.org/x/oauth2 v0.0.0-20211028175245-ba495a64dcb5 // indirect
-	golang.org/x/sys v0.0.0-20211031064116-611d5d643895 // indirect
+	golang.org/x/sys v0.0.0-20211102061401-a2f17f7b995c // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect

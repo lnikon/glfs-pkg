@@ -6,13 +6,15 @@ import (
 	"net/http"
 
 	"github.com/go-kit/kit/endpoint"
+
+	glconstants "github.com/lnikon/glfs-pkg/pkg/constants"
 )
 
 type algorithmRequest struct {
 }
 
 type algorithmResponse struct {
-	Algorithm []Algorithm
+	Algorithm []glconstants.Algorithm
 }
 
 func MakeAlgorithmEndpoint(svc *AlgorithmService) endpoint.Endpoint {
@@ -49,7 +51,7 @@ func EncodeResponse(_ context.Context, w http.ResponseWriter, response interface
 }
 
 type PostComputationRequest struct {
-	Algorithm Algorithm
+	Algorithm glconstants.Algorithm
 }
 
 type PostComputationResponse struct {
@@ -70,7 +72,7 @@ func MakePostComputationEndpoint(svc *ComputationService) endpoint.Endpoint {
 
 func DecodePostComputationRequest(_ context.Context, r *http.Request) (interface{}, error) {
 	var body struct {
-		Algorithm Algorithm `json:"algorithm"`
+		Algorithm glconstants.Algorithm `json:"algorithm"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

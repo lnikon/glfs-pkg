@@ -8,7 +8,6 @@ import (
 
 	// "k8s.io/apimachinery/pkg/api/errors"
 
-	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -28,11 +27,12 @@ func init() {
 	}
 }
 
-func createDeploymentClient() upcxxv1alpha1clientset.UPCXXInterface {
+func createUpcxxClient() upcxxv1alpha1clientset.UPCXXInterface {
 	flag.Parse()
 	kubeconfig := flag.Lookup("kubeconfig").Value.(flag.Getter).Get().(string)
+	log.Printf("kubeconfig=%v", kubeconfig)
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
+	if err != nil || config == nil {
 		log.Fatal(err)
 	}
 
@@ -41,7 +41,7 @@ func createDeploymentClient() upcxxv1alpha1clientset.UPCXXInterface {
 		log.Fatal(err)
 	}
 
-	return clientset.UPCXX("default")
+	return clientset.UPCXX("")
 }
 
 func GetPodsCount() int {
@@ -125,20 +125,19 @@ func CreateDeployment(name string) error {
 	return nil
 }
 
-func GetDeployment(name string) *appsv1.Deployment {
-	// deploymentClient := *createDeploymentClient()
-	// deployement, err := deploymentClient.Get(context.TODO(), name, metav1.GetOptions{})
-	// if err != nil {
-	// 	log.Fatal(err)
-	// 	return nil
-	// }
+func GetDeployment(name string) *upcxxv1alpha1types.UPCXX {
+	upcxxClient := createUpcxxClient()
+	deployement, err := upcxxClient.Get(name, metav1.GetOptions{})
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
 
-	// return deployement
-	return nil
+	return deployement
 }
 
 func GetAllDeployments() *upcxxv1alpha1types.UPCXXList {
-	deploymentClient := createDeploymentClient()
+	deploymentClient := createUpcxxClient()
 	deploymentList, err := deploymentClient.List(metav1.ListOptions{})
 	if err != nil {
 		return nil

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	glkube "github.com/lnikon/glfs-pkg/pkg/kube"
+	glconstants "github.com/lnikon/glfs-pkg/pkg/constants"
 )
 
 const (
@@ -11,7 +12,7 @@ const (
 )
 
 type Computation struct {
-	Algorithm Algorithm
+	Algorithm glconstants.Algorithm
 	Name      string
 }
 
@@ -57,10 +58,18 @@ func (c *ComputationService) GetAllComputations() []Computation {
 		})
 	}
 
-	return c.computations
+	return computations
 }
 
-func (c *ComputationService) PostComputation(algorithm Algorithm) (Computation, error) {
+func (c *ComputationService) GetComputation(name string) Computation {
+    upcxx := glkube.GetDeployment(name)
+    return Computation{
+        Name: upcxx.Spec.StatefulSetName,
+        Algorithm: upcxx.Spec.Algorithm,
+    }
+}
+
+func (c *ComputationService) PostComputation(algorithm glconstants.Algorithm) (Computation, error) {
 	computation := Computation{Algorithm: algorithm, Name: c.generateComputationName()}
 	if err := glkube.CreateDeployment(computation.Name); err != nil {
 		return computation, err

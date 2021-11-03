@@ -65,12 +65,12 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	_ = log.FromContext(ctx)
 	log := r.Log.WithValues("UPCXX", req.NamespacedName)
 
-	// 1. Check if my resource kind exists
-	log.Info("Fetching UPCXX resource")
+	// 1. Check if UPCXX resource exists
+	log.Info("Fetching UPCXX resource...")
 	upcxx := pgasv1alpha1.UPCXX{}
 	if err := r.Client.Get(ctx, req.NamespacedName, &upcxx); err != nil {
-		log.Error(err, "Resource already exsits")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		log.Error(err, "Resource already exsits!")
+		return ctrl.Result{}, nil
 	}
 
 	// 2. Get UPCXXJob with given name
