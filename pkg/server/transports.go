@@ -6,10 +6,12 @@ import (
 	"net/http"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/gorilla/mux"
 
 	glconstants "github.com/lnikon/glfs-pkg/pkg/constants"
 )
 
+// /algorithm endpoint
 type algorithmRequest struct {
 }
 
@@ -26,6 +28,33 @@ func MakeAlgorithmEndpoint(svc *AlgorithmService) endpoint.Endpoint {
 
 func DecodeAlgorithmRequest(_ context.Context, r *http.Request) (interface{}, error) {
 	return algorithmRequest{}, nil
+}
+
+type GetComputationRequest struct {
+	Name string
+}
+
+type GetComputationResponse struct {
+	Computation *Computation
+}
+
+func MakeGetComputationEndpoint(svc *ComputationService) endpoint.Endpoint {
+	return func(_ context.Context, request interface{}) (interface{}, error) {
+		req := request.(GetComputationRequest)
+		computation, err := svc.GetComputation(req.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		return GetComputationResponse{Computation: computation}, nil
+	}
+}
+
+func DecodeGetComputationRequest(_ context.Context, r *http.Request) (interface{}, error) {
+	name := mux.Vars(r)["name"]
+	return GetComputationRequest{
+		Name: name,
+	}, nil
 }
 
 type GetAllComputationsRequest struct {

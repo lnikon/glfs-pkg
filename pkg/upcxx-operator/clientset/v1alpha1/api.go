@@ -1,8 +1,6 @@
 package v1alpha1
 
 import (
-	"log"
-
 	"github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -26,18 +24,12 @@ func NewForConfig(c *rest.Config) (*UPCXXClient, error) {
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	config.UserAgent = rest.DefaultKubernetesUserAgent()
 
-	log.Printf("config=%v", config)
-
 	client, err := rest.RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
 
-	if client == nil {
-		log.Printf("REST client is nil")
-	}
-
-	log.Printf("UPCXX clientset successfully created!")
+	// log.Info("UPCXX clientset successfully created!")
 
 	return &UPCXXClient{restClient: client}, nil
 }
@@ -46,14 +38,6 @@ func (c *UPCXXClient) UPCXX(namespace string) UPCXXInterface {
 	upcxxClient := &UPCXXClient{
 		restClient: c.restClient,
 		ns:         namespace,
-	}
-
-	log.Printf("UPCXX client successfully created!")
-	l, err := upcxxClient.List(metav1.ListOptions{})
-	if err != nil || l == nil {
-		log.Printf("l is nil")
-	} else {
-		log.Printf("%v", l)
 	}
 	return upcxxClient
 }

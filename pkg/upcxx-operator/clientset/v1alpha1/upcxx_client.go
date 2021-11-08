@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"context"
+
 	"github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -23,7 +24,7 @@ func (c *UPCXXClient) Get(name string, opts metav1.GetOptions) (*v1alpha1.UPCXX,
 	result := v1alpha1.UPCXX{}
 	err := c.restClient.
 		Get().
-		Namespace(c.ns).
+		Namespace("default").
 		Resource("upcxxes").
 		Name(name).
 		VersionedParams(&opts, metav1.ParameterCodec).

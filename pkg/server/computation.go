@@ -1,10 +1,11 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 
-	glkube "github.com/lnikon/glfs-pkg/pkg/kube"
 	glconstants "github.com/lnikon/glfs-pkg/pkg/constants"
+	glkube "github.com/lnikon/glfs-pkg/pkg/kube"
 )
 
 const (
@@ -61,12 +62,16 @@ func (c *ComputationService) GetAllComputations() []Computation {
 	return computations
 }
 
-func (c *ComputationService) GetComputation(name string) Computation {
-    upcxx := glkube.GetDeployment(name)
-    return Computation{
-        Name: upcxx.Spec.StatefulSetName,
-        Algorithm: upcxx.Spec.Algorithm,
-    }
+func (c *ComputationService) GetComputation(name string) (*Computation, error) {
+	upcxx := glkube.GetDeployment(name)
+	if upcxx == nil {
+		return nil, errors.New("resource does not exists")
+	}
+
+	return &Computation{
+		Name:      upcxx.Spec.StatefulSetName,
+		Algorithm: upcxx.Spec.Algorithm,
+	}, nil
 }
 
 func (c *ComputationService) PostComputation(algorithm glconstants.Algorithm) (Computation, error) {

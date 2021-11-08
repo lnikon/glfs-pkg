@@ -30,7 +30,6 @@ func init() {
 func createUpcxxClient() upcxxv1alpha1clientset.UPCXXInterface {
 	flag.Parse()
 	kubeconfig := flag.Lookup("kubeconfig").Value.(flag.Getter).Get().(string)
-	log.Printf("kubeconfig=%v", kubeconfig)
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil || config == nil {
 		log.Fatal(err)
@@ -129,7 +128,6 @@ func GetDeployment(name string) *upcxxv1alpha1types.UPCXX {
 	upcxxClient := createUpcxxClient()
 	deployement, err := upcxxClient.Get(name, metav1.GetOptions{})
 	if err != nil {
-		log.Fatal(err)
 		return nil
 	}
 
