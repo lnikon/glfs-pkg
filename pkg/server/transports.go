@@ -12,7 +12,7 @@ import (
 )
 
 // /algorithm endpoint
-type algorithmRequest struct {
+type AlgorithmRequest struct {
 }
 
 type algorithmResponse struct {
@@ -27,7 +27,7 @@ func MakeAlgorithmEndpoint(svc *AlgorithmService) endpoint.Endpoint {
 }
 
 func DecodeAlgorithmRequest(_ context.Context, r *http.Request) (interface{}, error) {
-	return algorithmRequest{}, nil
+	return AlgorithmRequest{}, nil
 }
 
 type GetComputationRequest struct {
@@ -38,7 +38,7 @@ type GetComputationResponse struct {
 	Computation *Computation
 }
 
-func MakeGetComputationEndpoint(svc *ComputationService) endpoint.Endpoint {
+func MakeGetComputationEndpoint(svc ComputationServiceIfc) endpoint.Endpoint {
 	return func(_ context.Context, request interface{}) (interface{}, error) {
 		req := request.(GetComputationRequest)
 		computation, err := svc.GetComputation(req.Name)
@@ -64,7 +64,7 @@ type GetAllComputationsResponse struct {
 	Computations []Computation
 }
 
-func MakeGetAllComputationsEndpoint(svc *ComputationService) endpoint.Endpoint {
+func MakeGetAllComputationsEndpoint(svc ComputationServiceIfc) endpoint.Endpoint {
 	return func(_ context.Context, request interface{}) (interface{}, error) {
 		return GetAllComputationsResponse{Computations: svc.GetAllComputations()}, nil
 	}
@@ -84,10 +84,10 @@ type PostComputationRequest struct {
 }
 
 type PostComputationResponse struct {
-	Computation Computation
+	Computation *Computation
 }
 
-func MakePostComputationEndpoint(svc *ComputationService) endpoint.Endpoint {
+func MakePostComputationEndpoint(svc ComputationServiceIfc) endpoint.Endpoint {
 	return func(_ context.Context, request interface{}) (interface{}, error) {
 		req := request.(PostComputationRequest)
 		computation, err := svc.PostComputation(req.Algorithm)

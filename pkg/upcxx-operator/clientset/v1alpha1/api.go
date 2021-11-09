@@ -29,8 +29,6 @@ func NewForConfig(c *rest.Config) (*UPCXXClient, error) {
 		return nil, err
 	}
 
-	// log.Info("UPCXX clientset successfully created!")
-
 	return &UPCXXClient{restClient: client}, nil
 }
 

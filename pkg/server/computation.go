@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 
 	glconstants "github.com/lnikon/glfs-pkg/pkg/constants"
@@ -13,15 +12,25 @@ const (
 )
 
 type Computation struct {
-	Algorithm glconstants.Algorithm
-	Name      string
+	Algorithm glconstants.Algorithm `json:"algorithm"`
+	Name      string                `json:"name"`
+}
+
+func (c *Computation) String() string {
+	return fmt.Sprintf("{Algorithm: %v, Name: %v}", c.Algorithm, c.Name)
+}
+
+type ComputationServiceIfc interface {
+	GetComputation(name string) (*Computation, error)
+	GetAllComputations() []Computation
+	PostComputation(algorithm glconstants.Algorithm) (*Computation, error)
 }
 
 type ComputationService struct {
 	computations []Computation
 }
 
-func NewComputationService() (*ComputationService, error) {
+func NewComputationService() (ComputationServiceIfc, error) {
 	computationService := &ComputationService{}
 
 	// deploymentsList := glkube.GetAllDeployments()
@@ -65,7 +74,7 @@ func (c *ComputationService) GetAllComputations() []Computation {
 func (c *ComputationService) GetComputation(name string) (*Computation, error) {
 	upcxx := glkube.GetDeployment(name)
 	if upcxx == nil {
-		return nil, errors.New("resource does not exists")
+		return nil, fmt.Errorf("resource does not exists")
 	}
 
 	return &Computation{
@@ -74,12 +83,12 @@ func (c *ComputationService) GetComputation(name string) (*Computation, error) {
 	}, nil
 }
 
-func (c *ComputationService) PostComputation(algorithm glconstants.Algorithm) (Computation, error) {
+func (c *ComputationService) PostComputation(algorithm glconstants.Algorithm) (*Computation, error) {
 	computation := Computation{Algorithm: algorithm, Name: c.generateComputationName()}
 	if err := glkube.CreateDeployment(computation.Name); err != nil {
-		return computation, err
+		return &computation, err
 	}
 
 	c.computations = append(c.computations, computation)
-	return computation, nil
+	return &computation, nil
 }
