@@ -23,6 +23,7 @@ import (
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -80,6 +81,7 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	if apierrors.IsNotFound(err) {
 		log.Info("Could not find existing deployment for", "resource", upcxx.Spec.StatefulSetName)
 
+		statefulSet := buildStatefulSet(&upcxx)
 		deployment = *buildDeployment(upcxx)
 		if err := r.Client.Create(ctx, &deployment); err != nil {
 			log.Error(err, "Failed to create Deployment", "resource", upcxx.Spec.StatefulSetName)
@@ -112,6 +114,67 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func buildStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
+	statefulSet := apps.StatefulSet{
+		ObjectMeta: meta.ObjectMeta{
+			Name:            upcxx.Spec.StatefulSetName,
+			Namespace:       upcxx.Namespace,
+			OwnerReferences: []meta.OwnerReference{*meta.NewControllerRef(upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))},
+		},
+		Spec: apps.StatefulSetSpec{
+			Replicas: &upcxx.Spec.WorkerCount,
+			Selector: &meta.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": upcxx.Spec.StatefulSetName,
+				},
+			},
+			Template: core.PodTemplateSpec{
+				ObjectMeta: meta.ObjectMeta{
+					Labels: map[string]string{
+						"app": upcxx.Spec.StatefulSetName,
+					},
+				},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						core.Container{
+							Name:            "srvcln",
+							Image:           "lnikon/srvcln:latest",
+							ImagePullPolicy: "Always",
+							VolumeMounts: []core.VolumeMount{
+								core.VolumeMount{
+									Name:      upcxx.Spec.StatefulSetName + "-vm",
+									MountPath: "/vmount",
+								},
+							},
+						},
+					},
+				},
+			},
+			VolumeClaimTemplates: []core.PersistentVolumeClaim{
+				core.PersistentVolumeClaim{
+					ObjectMeta: meta.ObjectMeta{
+						Name: upcxx.Spec.StatefulSetName + "-vm",
+						Namespace: upcxx.Namespace,
+						OwnerReferences: []meta.OwnerReference{*meta.NewControllerRef(upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))},
+					},
+					Spec: core.PersistentVolumeClaimSpec{
+						AccessModes: []core.PersistentVolumeAccessMode{
+							core.ReadWriteOnce,
+						},
+						Resources: core.ResourceRequirements{
+							Requests: core.ResourceList{
+								core.ResourceStorage: *resource.NewQuantity(500, resource.BinarySI),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return &statefulSet
 }
 
 func buildDeployment(upcxx pgasv1alpha1.UPCXX) *apps.Deployment {
