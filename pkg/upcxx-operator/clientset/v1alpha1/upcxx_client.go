@@ -33,3 +33,16 @@ func (c *UPCXXClient) Get(name string, opts metav1.GetOptions) (*v1alpha1.UPCXX,
 
 	return &result, err
 }
+
+func (c *UPCXXClient) Create(upcxx *v1alpha1.UPCXX) (*v1alpha1.UPCXX, error) {
+	result := v1alpha1.UPCXX{}
+	err := c.restClient.
+		Post().
+		Namespace("default").
+		Resource("upcxxes").
+		Body(upcxx).
+		Do(context.TODO()).
+		Into(&result)
+
+	return &result, err
+}

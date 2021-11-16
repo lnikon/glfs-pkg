@@ -22,8 +22,8 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -76,25 +76,24 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	// 2. Get UPCXXJob with given name
 	log = log.WithValues("statefulset_name", upcxx.Spec.StatefulSetName)
-	deployment := apps.Deployment{}
-	err := r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: upcxx.Spec.StatefulSetName}, &deployment)
+	statefulSet := apps.StatefulSet{}
+	err := r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: upcxx.Spec.StatefulSetName}, &statefulSet)
 	if apierrors.IsNotFound(err) {
 		log.Info("Could not find existing deployment for", "resource", upcxx.Spec.StatefulSetName)
 
 		statefulSet := buildStatefulSet(&upcxx)
-		deployment = *buildDeployment(upcxx)
-		if err := r.Client.Create(ctx, &deployment); err != nil {
+		if err := r.Client.Create(ctx, statefulSet); err != nil {
 			log.Error(err, "Failed to create Deployment", "resource", upcxx.Spec.StatefulSetName)
 			return ctrl.Result{}, nil
 		}
 
-		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created", "deployment", &deployment.Name)
+		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created", "deployment", &statefulSet.Name)
 		log.Info("Created Deployment resource for UPCXX")
 		return ctrl.Result{}, nil
 	}
 
 	if err != nil {
-		log.Error(err, "Failed to get Deployment resource for UPCXX")
+		log.Error(err, "Failed to get StatefulSet resource for UPCXX")
 		return ctrl.Result{}, err
 	}
 
@@ -102,11 +101,11 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	log.Info("Deployment already exists for UPCXX", "resource", upcxx.Spec.StatefulSetName)
 
 	expectedReplicas := upcxx.Spec.WorkerCount
-	if expectedReplicas != *deployment.Spec.Replicas {
+	if expectedReplicas != *statefulSet.Spec.Replicas {
 		log.Info("Updating replica count for Deployment of", "resource", upcxx.Spec.StatefulSetName)
-		deployment.Spec.Replicas = &expectedReplicas
-		if err := r.Client.Update(ctx, &deployment); err != nil {
-			log.Error(err, "Failed to update", "old_replica_count", deployment.Spec.Replicas, "new_replica_count", expectedReplicas, "resource", upcxx.Spec.StatefulSetName)
+		statefulSet.Spec.Replicas = &expectedReplicas
+		if err := r.Client.Update(ctx, &statefulSet); err != nil {
+			log.Error(err, "Failed to update", "old_replica_count", statefulSet.Spec.Replicas, "new_replica_count", expectedReplicas, "resource", upcxx.Spec.StatefulSetName)
 			return ctrl.Result{}, err
 		}
 
@@ -132,18 +131,19 @@ func buildStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 			},
 			Template: core.PodTemplateSpec{
 				ObjectMeta: meta.ObjectMeta{
+					Name: upcxx.Spec.StatefulSetName,
 					Labels: map[string]string{
 						"app": upcxx.Spec.StatefulSetName,
 					},
 				},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
-						core.Container{
+						{
 							Name:            "srvcln",
 							Image:           "lnikon/srvcln:latest",
 							ImagePullPolicy: "Always",
 							VolumeMounts: []core.VolumeMount{
-								core.VolumeMount{
+								{
 									Name:      upcxx.Spec.StatefulSetName + "-vm",
 									MountPath: "/vmount",
 								},
@@ -153,10 +153,10 @@ func buildStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 				},
 			},
 			VolumeClaimTemplates: []core.PersistentVolumeClaim{
-				core.PersistentVolumeClaim{
+				{
 					ObjectMeta: meta.ObjectMeta{
-						Name: upcxx.Spec.StatefulSetName + "-vm",
-						Namespace: upcxx.Namespace,
+						Name:            upcxx.Spec.StatefulSetName + "-vm",
+						Namespace:       upcxx.Namespace,
 						OwnerReferences: []meta.OwnerReference{*meta.NewControllerRef(upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))},
 					},
 					Spec: core.PersistentVolumeClaimSpec{
@@ -175,40 +175,6 @@ func buildStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 	}
 
 	return &statefulSet
-}
-
-func buildDeployment(upcxx pgasv1alpha1.UPCXX) *apps.Deployment {
-	deployment := apps.Deployment{
-		ObjectMeta: meta.ObjectMeta{
-			Name:            upcxx.Spec.StatefulSetName,
-			Namespace:       upcxx.Namespace,
-			OwnerReferences: []meta.OwnerReference{*meta.NewControllerRef(&upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))},
-		},
-		Spec: apps.DeploymentSpec{
-			Replicas: &upcxx.Spec.WorkerCount,
-			Selector: &meta.LabelSelector{
-				MatchLabels: map[string]string{
-					"example-controller.jetstack.io/deployment-name": upcxx.Spec.StatefulSetName,
-				},
-			},
-			Template: core.PodTemplateSpec{
-				ObjectMeta: meta.ObjectMeta{
-					Labels: map[string]string{
-						"example-controller.jetstack.io/deployment-name": upcxx.Spec.StatefulSetName,
-					},
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{
-						{
-							Name:  "nginx",
-							Image: "nginx:latest",
-						},
-					},
-				},
-			},
-		},
-	}
-	return &deployment
 }
 
 // SetupWithManager sets up the controller with the Manager.

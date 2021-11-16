@@ -10,6 +10,7 @@ import (
 type UPCXXInterface interface {
 	List(opts metav1.ListOptions) (*v1alpha1.UPCXXList, error)
 	Get(string, metav1.GetOptions) (*v1alpha1.UPCXX, error)
+	Create(*v1alpha1.UPCXX) (*v1alpha1.UPCXX, error)
 }
 
 type UPCXXClient struct {

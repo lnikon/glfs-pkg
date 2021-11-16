@@ -85,7 +85,7 @@ func (c *ComputationService) GetComputation(name string) (*Computation, error) {
 
 func (c *ComputationService) PostComputation(algorithm glconstants.Algorithm) (*Computation, error) {
 	computation := Computation{Algorithm: algorithm, Name: c.generateComputationName()}
-	if err := glkube.CreateDeployment(computation.Name); err != nil {
+	if err := glkube.CreateUPCXX(computation.Name); err != nil {
 		return &computation, err
 	}
 
