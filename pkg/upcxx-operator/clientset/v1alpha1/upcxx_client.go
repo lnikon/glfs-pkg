@@ -40,6 +40,7 @@ func (c *UPCXXClient) Create(upcxx *v1alpha1.UPCXX) (*v1alpha1.UPCXX, error) {
 		Post().
 		Namespace("default").
 		Resource("upcxxes").
+		VersionedParams(&metav1.CreateOptions{}, metav1.ParameterCodec).
 		Body(upcxx).
 		Do(context.TODO()).
 		Into(&result)

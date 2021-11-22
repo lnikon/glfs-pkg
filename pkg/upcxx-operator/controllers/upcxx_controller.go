@@ -67,44 +67,57 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	log := r.Log.WithValues("UPCXX", req.NamespacedName)
 
 	// 1. Check if UPCXX resource exists
-	log.Info("Fetching UPCXX resource...")
 	upcxx := pgasv1alpha1.UPCXX{}
 	if err := r.Client.Get(ctx, req.NamespacedName, &upcxx); err != nil {
-		log.Error(err, "Resource already exsits!")
-		return ctrl.Result{}, nil
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
 	}
 
-	// 2. Get UPCXXJob with given name
-	log = log.WithValues("statefulset_name", upcxx.Spec.StatefulSetName)
-	statefulSet := apps.StatefulSet{}
-	err := r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: upcxx.Spec.StatefulSetName}, &statefulSet)
-	if apierrors.IsNotFound(err) {
-		log.Info("Could not find existing deployment for", "resource", upcxx.Spec.StatefulSetName)
+	if upcxx.OwnerReferences == nil {
+		log.Info("Owner reference for UPCXX is nil!")
+		upcxx.OwnerReferences = []meta.OwnerReference{*meta.NewControllerRef(&upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))}
+	}
 
-		statefulSet := buildStatefulSet(&upcxx)
+	log.Info("[VAGAG]", "upcxx.OwnerReferences", &upcxx.OwnerReferences)
+
+	// log.Info("[VAGAG] UPCXX", "upcxx", upcxx)
+
+	// 2. Get UPCXXJob with given name
+	log = log.WithValues("StatefulSetName", upcxx.Spec.StatefulSetName)
+	statefulSet := &apps.StatefulSet{}
+	err := r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: upcxx.Spec.StatefulSetName}, statefulSet)
+	if apierrors.IsNotFound(err) {
+		log.Info("Could not find existing StatefulSet for", "resource", upcxx.Spec.StatefulSetName)
+		statefulSet = buildStatefulSet(upcxx)
+
+		log.Info("[VAGAG 1] StatefulSet", "StatefulSet", &statefulSet)
+
+		// Maybe this client creates empty one? Use StatefulSet client from the clientset to check!
 		if err := r.Client.Create(ctx, statefulSet); err != nil {
-			log.Error(err, "Failed to create Deployment", "resource", upcxx.Spec.StatefulSetName)
+			log.Error(err, "Failed to create StatefulSet", "resource", upcxx.Spec.StatefulSetName)
 			return ctrl.Result{}, nil
 		}
 
-		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created", "deployment", &statefulSet.Name)
-		log.Info("Created Deployment resource for UPCXX")
-		return ctrl.Result{}, nil
+		log.Info("[VAGAG 2] StatefulSet", "StatefulSet", &statefulSet)
+
+		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created StatefulSet", statefulSet.Name)
+		log.Info("Created StatefulSet resource for UPCXX")
+	} else {
+		// log.Info("StatefulSet already exists for UPCXX", "StatefulSet", statefulSet)
 	}
 
-	if err != nil {
-		log.Error(err, "Failed to get StatefulSet resource for UPCXX")
-		return ctrl.Result{}, err
-	}
+	// if err != nil {
+	// 	log.Error(err, "Failed to get StatefulSet resource for UPCXX")
+	// 	return ctrl.Result{}, err
+	// }
 
-	// 3. If exists, ignore and apply changed
-	log.Info("Deployment already exists for UPCXX", "resource", upcxx.Spec.StatefulSetName)
-
+	// 3. If exists, ignore and apply changes
 	expectedReplicas := upcxx.Spec.WorkerCount
 	if expectedReplicas != *statefulSet.Spec.Replicas {
 		log.Info("Updating replica count for Deployment of", "resource", upcxx.Spec.StatefulSetName)
 		statefulSet.Spec.Replicas = &expectedReplicas
-		if err := r.Client.Update(ctx, &statefulSet); err != nil {
+		if err := r.Client.Update(ctx, statefulSet); err != nil {
 			log.Error(err, "Failed to update", "old_replica_count", statefulSet.Spec.Replicas, "new_replica_count", expectedReplicas, "resource", upcxx.Spec.StatefulSetName)
 			return ctrl.Result{}, err
 		}
@@ -115,12 +128,14 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{}, nil
 }
 
-func buildStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
+func buildStatefulSet(upcxx pgasv1alpha1.UPCXX) *apps.StatefulSet {
+	controllerRef := *meta.NewControllerRef(&upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))
 	statefulSet := apps.StatefulSet{
+		TypeMeta: meta.TypeMeta{},
 		ObjectMeta: meta.ObjectMeta{
 			Name:            upcxx.Spec.StatefulSetName,
 			Namespace:       upcxx.Namespace,
-			OwnerReferences: []meta.OwnerReference{*meta.NewControllerRef(upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))},
+			OwnerReferences: []meta.OwnerReference{controllerRef},
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas: &upcxx.Spec.WorkerCount,
@@ -139,8 +154,8 @@ func buildStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 				Spec: core.PodSpec{
 					Containers: []core.Container{
 						{
-							Name:            "srvcln",
-							Image:           "lnikon/srvcln:latest",
+							Name:            "nginx",
+							Image:           "nginx",
 							ImagePullPolicy: "Always",
 							VolumeMounts: []core.VolumeMount{
 								{
@@ -157,7 +172,7 @@ func buildStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 					ObjectMeta: meta.ObjectMeta{
 						Name:            upcxx.Spec.StatefulSetName + "-vm",
 						Namespace:       upcxx.Namespace,
-						OwnerReferences: []meta.OwnerReference{*meta.NewControllerRef(upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))},
+						OwnerReferences: []meta.OwnerReference{controllerRef},
 					},
 					Spec: core.PersistentVolumeClaimSpec{
 						AccessModes: []core.PersistentVolumeAccessMode{

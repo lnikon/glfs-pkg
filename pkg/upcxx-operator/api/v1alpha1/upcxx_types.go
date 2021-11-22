@@ -46,6 +46,7 @@ type UPCXXStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
+// +genclient:nonNamespaced
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
