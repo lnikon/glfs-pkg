@@ -93,14 +93,6 @@ func CreateUPCXX(name string) error {
 		ObjectMeta: metav1.ObjectMeta {
 			Name: name,
 			Namespace: "default",
-			// OwnerReferences: []meta.OwnerReference{
-			// 	{
-			// 		APIVersion: apiVersion,
-			// 		Kind: kind,
-			//     UID: uuid.NewUUID(),
-			// 		Name: name,
-			// 	},
-			// },
 		},
 		Spec: upcxxv1alpha1types.UPCXXSpec{
 			StatefulSetName: name,

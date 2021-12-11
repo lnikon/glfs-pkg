@@ -19,7 +19,9 @@ package controllers
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
+	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -30,15 +32,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	log "sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/go-logr/logr"
 	pgasv1alpha1 "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
+
+	"fmt"
+	"strings"
 )
 
 const (
 	// Container that contains UPCXX graphs library and application
-	UPCXXContainerName       = "upcxx"
-	UPCXXContainerTagLatest  = ":latest"
+	UPCXXContainerName       = "pgasgraph"
+	UPCXXContainerTagLatest  = ":v0.1"
 	UPCXXLatestContainerName = UPCXXContainerName + UPCXXContainerTagLatest
+
+	// Launcher specific definitions
+	launcherSuffix        = "-launcher"
+	launcherJobSuffix     = "-launcher-job"
+	launcherServiceSuffix = "-launcher-service"
+
+	// Worker specific definitions
+	workerSuffix        = "-worker"
+	workerServiceSuffix = "-worker-service"
 )
 
 // UPCXXReconciler reconciles a UPCXX object
@@ -66,7 +79,6 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	_ = log.FromContext(ctx)
 	log := r.Log.WithValues("UPCXX", req.NamespacedName)
 
-	// 1. Check if UPCXX resource exists
 	upcxx := pgasv1alpha1.UPCXX{}
 	if err := r.Client.Get(ctx, req.NamespacedName, &upcxx); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -74,89 +86,182 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 	}
 
-	if upcxx.OwnerReferences == nil {
-		log.Info("Owner reference for UPCXX is nil!")
-		upcxx.OwnerReferences = []meta.OwnerReference{*meta.NewControllerRef(&upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))}
-	}
-
-	log.Info("[VAGAG]", "upcxx.OwnerReferences", &upcxx.OwnerReferences)
-
-	// log.Info("[VAGAG] UPCXX", "upcxx", upcxx)
-
-	// 2. Get UPCXXJob with given name
-	log = log.WithValues("StatefulSetName", upcxx.Spec.StatefulSetName)
-	statefulSet := &apps.StatefulSet{}
-	err := r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: upcxx.Spec.StatefulSetName}, statefulSet)
+	launcherService := &core.Service{}
+	err := r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: buildLauncherJobName(&upcxx)}, launcherService)
 	if apierrors.IsNotFound(err) {
-		log.Info("Could not find existing StatefulSet for", "resource", upcxx.Spec.StatefulSetName)
-		statefulSet = buildStatefulSet(upcxx)
+		log.Info("Could not find existing Service for launcher Job")
 
-		log.Info("[VAGAG 1] StatefulSet", "StatefulSet", &statefulSet)
-
-		// Maybe this client creates empty one? Use StatefulSet client from the clientset to check!
-		if err := r.Client.Create(ctx, statefulSet); err != nil {
-			log.Error(err, "Failed to create StatefulSet", "resource", upcxx.Spec.StatefulSetName)
-			return ctrl.Result{}, nil
-		}
-
-		log.Info("[VAGAG 2] StatefulSet", "StatefulSet", &statefulSet)
-
-		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created StatefulSet", statefulSet.Name)
-		log.Info("Created StatefulSet resource for UPCXX")
-	} else {
-		// log.Info("StatefulSet already exists for UPCXX", "StatefulSet", statefulSet)
-	}
-
-	// if err != nil {
-	// 	log.Error(err, "Failed to get StatefulSet resource for UPCXX")
-	// 	return ctrl.Result{}, err
-	// }
-
-	// 3. If exists, ignore and apply changes
-	expectedReplicas := upcxx.Spec.WorkerCount
-	if expectedReplicas != *statefulSet.Spec.Replicas {
-		log.Info("Updating replica count for Deployment of", "resource", upcxx.Spec.StatefulSetName)
-		statefulSet.Spec.Replicas = &expectedReplicas
-		if err := r.Client.Update(ctx, statefulSet); err != nil {
-			log.Error(err, "Failed to update", "old_replica_count", statefulSet.Spec.Replicas, "new_replica_count", expectedReplicas, "resource", upcxx.Spec.StatefulSetName)
+		launcherService = buildLauncherService(&upcxx)
+		if err := r.Client.Create(ctx, launcherService); err != nil {
+			log.Error(err, "Unable to create Service for Launcher Job")
 			return ctrl.Result{}, err
 		}
 
-		log.Info("Successfuly updated replica count for", "resource", upcxx.Spec.StatefulSetName)
+		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created Service for launcher Job", buildLauncherJobName(&upcxx))
 	}
+
+	workerService := &core.Service{}
+	err = r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: buildWorkerPodName(&upcxx)}, workerService)
+	if apierrors.IsNotFound(err) {
+		log.Info("Could not find existing Service for launcher Job")
+
+		workerService = buildWorkerService(&upcxx)
+		if err := r.Client.Create(ctx, workerService); err != nil {
+			log.Error(err, "Unable to create Service for Launcher Job")
+			return ctrl.Result{}, err
+		}
+
+		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created Service for worker StatefulSet", buildWorkerPodName(&upcxx))
+	}
+
+	log = log.WithValues("StatefulSetName", upcxx.Spec.StatefulSetName)
+	statefulSet := &apps.StatefulSet{}
+	err = r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: buildWorkerPodName(&upcxx)}, statefulSet)
+	if apierrors.IsNotFound(err) {
+		log.Info("Could not find existing StatefulSet for", "resource", buildWorkerPodName(&upcxx))
+		statefulSet = buildWorkerStatefulSet(&upcxx)
+
+		if err := r.Client.Create(ctx, statefulSet); err != nil {
+			log.Error(err, "Failed to create StatefulSet", "resource", buildWorkerPodName(&upcxx))
+			return ctrl.Result{}, err
+		}
+
+		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created StatefulSet", buildWorkerPodName(&upcxx))
+	}
+
+	launcherJob := &batch.Job{}
+	err = r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: buildLauncherJobName(&upcxx)}, launcherJob)
+	if apierrors.IsNotFound(err) {
+		log.Info("Could not find existing Job for launcher job")
+
+		launcherJob = buildLauncherJob(&upcxx)
+		if err := r.Client.Create(ctx, launcherJob); err != nil {
+			log.Error(err, "Failed to create Job for launcher pod")
+			return ctrl.Result{}, err
+		}
+
+		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created Job for launcher", buildLauncherJobName(&upcxx))
+	}
+
+	// podList := &core.PodList{}
+	// err = r.List(ctx, podList, client.InNamespace(upcxx.Namespace), client.MatchingLabels{"ownerStatefulSet": upcxx.Spec.StatefulSetName})
+	// if err != nil {
+	// 	log.Error(err, "unable to get pod list for UPCXX resource")
+	// }
+
+	// expectedReplicas := upcxx.Spec.WorkerCount
+	// if expectedReplicas != *statefulSet.Spec.Replicas {
+	// 	log.Info("Updating replica count forDeployment of", "resource", upcxx.Spec.StatefulSetName)
+	// 	statefulSet.Spec.Replicas = &expectedReplicas
+	// 	if err := r.Client.Update(ctx, statefulSet); err != nil {
+	// 		log.Error(err, "Failed to update", "old_replica_count", statefulSet.Spec.Replicas, "new_replica_count", expectedReplicas, "resource", upcxx.Spec.StatefulSetName)
+	// 		return ctrl.Result{}, err
+	// 	}
+
+	// 	log.Info("Successfuly updated replica count for", "resource", upcxx.Spec.StatefulSetName)
+	// }
 
 	return ctrl.Result{}, nil
 }
 
-func buildStatefulSet(upcxx pgasv1alpha1.UPCXX) *apps.StatefulSet {
-	controllerRef := *meta.NewControllerRef(&upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))
-	statefulSet := apps.StatefulSet{
-		TypeMeta: meta.TypeMeta{},
+func buildLauncherJobName(upcxx *pgasv1alpha1.UPCXX) string {
+	return upcxx.Spec.StatefulSetName + launcherJobSuffix
+}
+
+func buildLauncherPodName(upcxx *pgasv1alpha1.UPCXX) string {
+	return upcxx.Spec.StatefulSetName + launcherSuffix
+}
+
+func buildLauncherJob(upcxx *pgasv1alpha1.UPCXX) *batch.Job {
+	controllerRef := *meta.NewControllerRef(upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))
+	launcherJobSpec := &batch.Job{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            upcxx.Spec.StatefulSetName,
-			Namespace:       upcxx.Namespace,
+			Name:      buildLauncherJobName(upcxx),
+			Namespace: upcxx.ObjectMeta.Namespace,
+			Labels: map[string]string{
+				"app": buildLauncherJobName(upcxx),
+			},
 			OwnerReferences: []meta.OwnerReference{controllerRef},
 		},
-		Spec: apps.StatefulSetSpec{
-			Replicas: &upcxx.Spec.WorkerCount,
-			Selector: &meta.LabelSelector{
-				MatchLabels: map[string]string{
-					"app": upcxx.Spec.StatefulSetName,
-				},
-			},
+		Spec: batch.JobSpec{
+			// TTLSecondsAfterFinished: mpiJob.Spec.RunPolicy.TTLSecondsAfterFinished,
+			// ActiveDeadlineSeconds:   mpiJob.Spec.RunPolicy.ActiveDeadlineSeconds,
+			BackoffLimit: int32ToPtr(1),
 			Template: core.PodTemplateSpec{
 				ObjectMeta: meta.ObjectMeta{
-					Name: upcxx.Spec.StatefulSetName,
+					Name: buildLauncherJobName(upcxx),
 					Labels: map[string]string{
-						"app": upcxx.Spec.StatefulSetName,
+						"app": buildLauncherJobName(upcxx),
 					},
 				},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
 						{
-							Name:            "nginx",
-							Image:           "nginx",
-							ImagePullPolicy: "Always",
+							Name:            UPCXXContainerName,
+							Image:           UPCXXLatestContainerName,
+							ImagePullPolicy: "Never",
+							Command:         []string{"sleep", "infinity"},
+							Ports: []core.ContainerPort{
+								{
+									Name:          buildLauncherJobName(upcxx),
+									ContainerPort: 80,
+								},
+							},
+						},
+					},
+					RestartPolicy: core.RestartPolicyNever,
+				},
+			},
+		},
+	}
+
+	launcherJobSpec.Spec.Template.Spec.Containers[0].Env = append(launcherJobSpec.Spec.Template.Spec.Containers[0].Env, createSSHServersEnv(upcxx.Spec.StatefulSetName, upcxx.Spec.WorkerCount))
+	launcherJobSpec.Spec.Template.Spec.Containers[0].Env = append(launcherJobSpec.Spec.Template.Spec.Containers[0].Env, core.EnvVar{Name: "UPCXX_NETWORK", Value: "udp"})
+
+	return launcherJobSpec
+}
+
+func buildWorkerPodName(upcxx *pgasv1alpha1.UPCXX) string {
+	return upcxx.Spec.StatefulSetName + workerSuffix
+}
+
+func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
+	controllerRef := *meta.NewControllerRef(upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))
+	statefulSet := apps.StatefulSet{
+		ObjectMeta: meta.ObjectMeta{
+			// TODO: Should we pass sts name in the yaml? It can be same as the resource name or with -sts postfix.
+			Name:            buildWorkerPodName(upcxx),
+			Namespace:       upcxx.Namespace,
+			OwnerReferences: []meta.OwnerReference{controllerRef},
+		},
+		Spec: apps.StatefulSetSpec{
+			ServiceName: buildWorkerPodName(upcxx),
+			Replicas:    getWorkerCount(upcxx),
+			Selector: &meta.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": buildWorkerPodName(upcxx),
+				},
+			},
+			Template: core.PodTemplateSpec{
+				ObjectMeta: meta.ObjectMeta{
+					Name: buildWorkerPodName(upcxx),
+					Labels: map[string]string{
+						"app": buildWorkerPodName(upcxx),
+					},
+				},
+				Spec: core.PodSpec{
+					Containers: []core.Container{
+						{
+							Name:            UPCXXContainerName,
+							Image:           UPCXXLatestContainerName,
+							ImagePullPolicy: "Never",
+							Command:         []string{"sleep", "infinity"},
+							Ports: []core.ContainerPort{
+								{
+									Name:          buildWorkerPodName(upcxx),
+									ContainerPort: 80,
+								},
+							},
 							VolumeMounts: []core.VolumeMount{
 								{
 									Name:      upcxx.Spec.StatefulSetName + "-vm",
@@ -189,7 +294,63 @@ func buildStatefulSet(upcxx pgasv1alpha1.UPCXX) *apps.StatefulSet {
 		},
 	}
 
+	statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, createSSHServersEnv(upcxx.Spec.StatefulSetName, upcxx.Spec.WorkerCount))
+	statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, core.EnvVar{Name: "UPCXX_NETWORK", Value: "udp"})
+
 	return &statefulSet
+}
+
+func createSSHServersEnv(stsName string, replicas int32) core.EnvVar {
+	sshServersList := []string{}
+	for idx := int32(0); idx < replicas; idx++ {
+		sshServersList = append(sshServersList, fmt.Sprintf("%s-%d", stsName, idx))
+	}
+
+	return core.EnvVar{Name: "SSH_SERVERS", Value: strings.Join(sshServersList, ",")}
+}
+
+func getWorkerCount(upcxx *pgasv1alpha1.UPCXX) *int32 {
+	workerCount := upcxx.Spec.WorkerCount - 1
+	return &workerCount
+}
+
+func buildLauncherService(upcxx *pgasv1alpha1.UPCXX) *core.Service {
+	return newService(upcxx, buildLauncherJobName(upcxx))
+}
+
+func buildWorkerService(upcxx *pgasv1alpha1.UPCXX) *core.Service {
+	return newService(upcxx, buildWorkerPodName(upcxx))
+}
+
+func newService(upcxx *pgasv1alpha1.UPCXX, name string) *core.Service {
+	return &core.Service{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      name,
+			Namespace: upcxx.Namespace,
+			Labels: map[string]string{
+				"app": name,
+			},
+			OwnerReferences: []meta.OwnerReference{
+				*meta.NewControllerRef(upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX")),
+			},
+		},
+		Spec: core.ServiceSpec{
+			Ports: []core.ServicePort{
+				{
+					Name: name,
+					Port: 80,
+				},
+			},
+			ClusterIP: core.ClusterIPNone,
+			Selector: map[string]string{
+				"app": name,
+			},
+		},
+	}
+}
+
+func int32ToPtr(i int32) *int32 {
+	return &i
 }
 
 // SetupWithManager sets up the controller with the Manager.
