@@ -18,8 +18,13 @@ package controllers
 
 import (
 	"context"
-
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"github.com/go-logr/logr"
+	"golang.org/x/crypto/ssh"
 	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
@@ -52,6 +57,39 @@ const (
 	// Worker specific definitions
 	workerSuffix        = "-worker"
 	workerServiceSuffix = "-worker-service"
+
+	// SSH
+	sshAuthSecretSuffix   = "-ssh"
+	sshAuthVolume         = "ssh-auth"
+	rootSSHPath           = "/home/upcxx/.ssh"
+	originalSSHPath       = "ssh"
+	sshPublicKey          = "ssh-publickey"
+	sshPrivateKeyFile     = "id_rsa"
+	sshPublicKeyFile      = sshPrivateKeyFile + ".pub"
+	sshAuthorizedKeysFile = "authorized_keys"
+	sshKnownHosts         = "known_hosts"
+	sshKnownHostsFile     = "known_hosts"
+)
+
+var (
+	sshVolumeItems = []core.KeyToPath{
+		{
+			Key:  core.SSHAuthPrivateKey,
+			Path: sshPrivateKeyFile,
+		},
+		{
+			Key:  sshPublicKey,
+			Path: sshPublicKeyFile,
+		},
+		{
+			Key:  sshPublicKey,
+			Path: sshAuthorizedKeysFile,
+		},
+		{
+			Key:  sshKnownHosts,
+			Path: sshKnownHostsFile,
+		},
+	}
 )
 
 // UPCXXReconciler reconciles a UPCXX object
@@ -68,7 +106,6 @@ type UPCXXReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
 // the UPCXX object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
@@ -84,6 +121,10 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
+	}
+
+	if _, err := r.getOrCreateSSHAuthSecret(&upcxx); err != nil {
+		log.Error(err, "creating SSH auth secret")
 	}
 
 	launcherService := &core.Service{}
@@ -165,7 +206,7 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 }
 
 func buildLauncherJobName(upcxx *pgasv1alpha1.UPCXX) string {
-	return upcxx.Spec.StatefulSetName + launcherJobSuffix
+	return upcxx.Spec.StatefulSetName + launcherSuffix
 }
 
 func buildLauncherPodName(upcxx *pgasv1alpha1.UPCXX) string {
@@ -195,6 +236,7 @@ func buildLauncherJob(upcxx *pgasv1alpha1.UPCXX) *batch.Job {
 					},
 				},
 				Spec: core.PodSpec{
+					Hostname: buildLauncherJobName(upcxx),
 					Containers: []core.Container{
 						{
 							Name:            UPCXXContainerName,
@@ -203,7 +245,8 @@ func buildLauncherJob(upcxx *pgasv1alpha1.UPCXX) *batch.Job {
 							Command:         []string{"sleep", "infinity"},
 							Ports: []core.ContainerPort{
 								{
-									Name:          buildLauncherJobName(upcxx),
+									// Name:          buildLauncherJobName(upcxx),
+									// Name:          buildLauncherJobName(upcxx),
 									ContainerPort: 80,
 								},
 							},
@@ -215,8 +258,8 @@ func buildLauncherJob(upcxx *pgasv1alpha1.UPCXX) *batch.Job {
 		},
 	}
 
-	launcherJobSpec.Spec.Template.Spec.Containers[0].Env = append(launcherJobSpec.Spec.Template.Spec.Containers[0].Env, createSSHServersEnv(upcxx.Spec.StatefulSetName, upcxx.Spec.WorkerCount))
-	launcherJobSpec.Spec.Template.Spec.Containers[0].Env = append(launcherJobSpec.Spec.Template.Spec.Containers[0].Env, core.EnvVar{Name: "UPCXX_NETWORK", Value: "udp"})
+	launcherJobSpec.Spec.Template.Spec.Containers[0].Env = append(launcherJobSpec.Spec.Template.Spec.Containers[0].Env, createEnvVars(upcxx)...)
+	setupSSHOnPod(&launcherJobSpec.Spec.Template.Spec, upcxx)
 
 	return launcherJobSpec
 }
@@ -226,6 +269,7 @@ func buildWorkerPodName(upcxx *pgasv1alpha1.UPCXX) string {
 }
 
 func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
+	readOnlyRootFilesystem := false
 	controllerRef := *meta.NewControllerRef(upcxx, pgasv1alpha1.GroupVersion.WithKind("UPCXX"))
 	statefulSet := apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
@@ -250,15 +294,24 @@ func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 					},
 				},
 				Spec: core.PodSpec{
+					Hostname: buildWorkerPodName(upcxx),
+					Volumes: []core.Volume{
+						{
+							Name: "empty-dir-vm",
+							VolumeSource: core.VolumeSource{
+								EmptyDir: &core.EmptyDirVolumeSource{},
+							},
+						},
+					},
 					Containers: []core.Container{
 						{
 							Name:            UPCXXContainerName,
 							Image:           UPCXXLatestContainerName,
 							ImagePullPolicy: "Never",
-							Command:         []string{"sleep", "infinity"},
+							//Command:         []string{"sleep", "infinity"},
 							Ports: []core.ContainerPort{
 								{
-									Name:          buildWorkerPodName(upcxx),
+									// Name:          buildWorkerPodName(upcxx),
 									ContainerPort: 80,
 								},
 							},
@@ -267,6 +320,15 @@ func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 									Name:      upcxx.Spec.StatefulSetName + "-vm",
 									MountPath: "/vmount",
 								},
+								//{
+								//	Name:      "empty-dir-vm",
+								//	MountPath: rootSSHPath,
+								//},
+							},
+							SecurityContext: &core.SecurityContext{
+								RunAsUser:              int64ToPtr(1000),
+								RunAsGroup:             int64ToPtr(1000),
+								ReadOnlyRootFilesystem: &readOnlyRootFilesystem,
 							},
 						},
 					},
@@ -281,7 +343,7 @@ func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 					},
 					Spec: core.PersistentVolumeClaimSpec{
 						AccessModes: []core.PersistentVolumeAccessMode{
-							core.ReadWriteOnce,
+							core.ReadWriteMany,
 						},
 						Resources: core.ResourceRequirements{
 							Requests: core.ResourceList{
@@ -294,19 +356,44 @@ func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 		},
 	}
 
-	statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, createSSHServersEnv(upcxx.Spec.StatefulSetName, upcxx.Spec.WorkerCount))
-	statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, core.EnvVar{Name: "UPCXX_NETWORK", Value: "udp"})
+	statefulSet.Spec.Template.Spec.Containers[0].Env = append(statefulSet.Spec.Template.Spec.Containers[0].Env, createEnvVars(upcxx)...)
+	setupSSHOnPod(&statefulSet.Spec.Template.Spec, upcxx)
 
 	return &statefulSet
 }
 
-func createSSHServersEnv(stsName string, replicas int32) core.EnvVar {
+func createSSHServersEnv(upcxx *pgasv1alpha1.UPCXX) (core.EnvVar, []string) {
 	sshServersList := []string{}
-	for idx := int32(0); idx < replicas; idx++ {
-		sshServersList = append(sshServersList, fmt.Sprintf("%s-%d", stsName, idx))
+	sshServersList = append(sshServersList, buildLauncherJobName(upcxx))
+	workerName := buildWorkerPodName(upcxx)
+	for idx := int32(0); idx < upcxx.Spec.WorkerCount-1; idx++ {
+		sshServersList = append(sshServersList, fmt.Sprintf("%s-%d.%s.%s", workerName, idx, workerName, "default.svc.cluster.local"))
 	}
 
-	return core.EnvVar{Name: "SSH_SERVERS", Value: strings.Join(sshServersList, ",")}
+	return core.EnvVar{Name: "SSH_SERVERS", Value: strings.Join(sshServersList, ",")}, sshServersList
+}
+
+func createEnvVars(upcxx *pgasv1alpha1.UPCXX) []core.EnvVar {
+	sshServersEnv, sshServerList := createSSHServersEnv(upcxx)
+	return []core.EnvVar{
+		sshServersEnv,
+		{
+			Name:  "GASNET_SSH_SERVERS",
+			Value: sshServersEnv.Value,
+		},
+		{
+			Name:  "GASNET_MASTERIP",
+			Value: sshServerList[0],
+		},
+		{
+			Name:  "UPCXX_NETWORK",
+			Value: "udp",
+		},
+		{
+			Name:  "GASNET_SPAWNFN",
+			Value: "S",
+		},
+	}
 }
 
 func getWorkerCount(upcxx *pgasv1alpha1.UPCXX) *int32 {
@@ -337,7 +424,7 @@ func newService(upcxx *pgasv1alpha1.UPCXX, name string) *core.Service {
 		Spec: core.ServiceSpec{
 			Ports: []core.ServicePort{
 				{
-					Name: name,
+					// Name: name,
 					Port: 80,
 				},
 			},
@@ -349,7 +436,101 @@ func newService(upcxx *pgasv1alpha1.UPCXX, name string) *core.Service {
 	}
 }
 
+// getOrCreateSSHAuthSecret gets the Secret holding the SSH auth for this job,
+// or create one if it doesn't exist.
+func (r *UPCXXReconciler) getOrCreateSSHAuthSecret(job *pgasv1alpha1.UPCXX) (*core.ConfigMap, error) {
+	secret := &core.ConfigMap{}
+	err := r.Get(context.TODO(), client.ObjectKey{Namespace: job.Namespace,
+		Name: job.Spec.StatefulSetName + sshAuthSecretSuffix}, secret)
+	if apierrors.IsNotFound(err) {
+		secret, err = newSSHAuthSecret(job)
+		if err != nil {
+			return nil, err
+		}
+		if err := r.Create(context.TODO(), secret); err != nil {
+			return nil, err
+		}
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return secret, nil
+}
+
+// newSSHAuthSecret creates a new Secret that holds SSH auth: a private Key
+// and its public key version.
+func newSSHAuthSecret(job *pgasv1alpha1.UPCXX) (*core.ConfigMap, error) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("generating private SSH key: %w", err)
+	}
+	privateDER, err := x509.MarshalECPrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("converting private SSH key to DER format: %w", err)
+	}
+	privatePEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: privateDER,
+	})
+
+	publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("generating public SSH key: %w", err)
+	}
+
+	return &core.ConfigMap{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      job.Spec.StatefulSetName + sshAuthSecretSuffix,
+			Namespace: job.Namespace,
+			Labels: map[string]string{
+				"app": job.Spec.StatefulSetName,
+			},
+			OwnerReferences: []meta.OwnerReference{
+				*meta.NewControllerRef(job, pgasv1alpha1.GroupVersion.WithKind("UPCXX")),
+			},
+		},
+
+		BinaryData: map[string][]byte{
+			core.SSHAuthPrivateKey: privatePEM,
+			sshPublicKey:           ssh.MarshalAuthorizedKey(publicKey),
+			sshKnownHosts:          []byte{},
+		},
+	}, nil
+}
+
+func setupSSHOnPod(podSpec *core.PodSpec, job *pgasv1alpha1.UPCXX) {
+	mainContainer := &podSpec.Containers[0]
+	mode := int32ToPtr(0666)
+	podSpec.Volumes = append(podSpec.Volumes,
+		core.Volume{
+			Name: sshAuthVolume,
+			VolumeSource: core.VolumeSource{
+				ConfigMap: &core.ConfigMapVolumeSource{
+					DefaultMode: mode,
+					LocalObjectReference: core.LocalObjectReference{
+						Name: job.Spec.StatefulSetName + sshAuthSecretSuffix,
+					},
+					Items: sshVolumeItems,
+				},
+			},
+		})
+
+	mainContainer.VolumeMounts = append(mainContainer.VolumeMounts,
+		core.VolumeMount{
+			Name: sshAuthVolume,
+			//MountPath: originalSSHPath,
+			MountPath: "/home/upcxx/ssh-keys",
+			ReadOnly:  true,
+		})
+}
+
 func int32ToPtr(i int32) *int32 {
+	return &i
+}
+
+func int64ToPtr(i int64) *int64 {
 	return &i
 }
 

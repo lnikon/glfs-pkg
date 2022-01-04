@@ -7,6 +7,7 @@ require (
 	github.com/lnikon/glfs-pkg/pkg/constants v0.0.0-20211103152516-cac955b50b84
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.16.0
+	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	k8s.io/api v0.22.3
 	k8s.io/apimachinery v0.22.3
 	k8s.io/client-go v0.22.3
@@ -61,9 +62,8 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.19.1 // indirect
-	golang.org/x/crypto v0.0.0-20210915214749-c084706c2272 // indirect
 	golang.org/x/mod v0.4.2 // indirect
-	golang.org/x/net v0.0.0-20211101193420-4a448f8816b3 // indirect
+	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
 	golang.org/x/oauth2 v0.0.0-20211028175245-ba495a64dcb5 // indirect
 	golang.org/x/sys v0.0.0-20211102061401-a2f17f7b995c // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect

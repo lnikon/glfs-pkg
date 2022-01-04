@@ -4,6 +4,6 @@ metadata:
   name: upcxx-sample
 spec:
   # Add fields here
-  statefulSetName: u
+  statefulSetName: z
   workerCount: 3
   algorithm: kruskal
