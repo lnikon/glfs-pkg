@@ -11,12 +11,12 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
+	glconst "github.com/lnikon/glfs-pkg/pkg/constants"
+	upcxxv1alpha1types "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
+	upcxxv1alpha1clientset "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/clientset/v1alpha1"
 	// meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	// apiextensions "k8s.io/apiextensions-apiserver"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	upcxxv1alpha1types "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
-	glconst "github.com/lnikon/glfs-pkg/pkg/constants"
-	upcxxv1alpha1clientset "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/clientset/v1alpha1"
 	// uuid "k8s.io/apimachinery/pkg/util/uuid"
 )
 
@@ -87,17 +87,17 @@ func CreateUPCXX(name string) error {
 
 	upcxx := &upcxxv1alpha1types.UPCXX{
 		TypeMeta: metav1.TypeMeta{
-			Kind: kind,
+			Kind:       kind,
 			APIVersion: apiVersion,
 		},
-		ObjectMeta: metav1.ObjectMeta {
-			Name: name,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
 			Namespace: "default",
 		},
 		Spec: upcxxv1alpha1types.UPCXXSpec{
 			StatefulSetName: name,
-			WorkerCount: 2,
-			Algorithm: glconst.Kruskal,
+			WorkerCount:     2,
+			Algorithm:       glconst.Kruskal,
 		},
 		Status: upcxxv1alpha1types.UPCXXStatus{},
 	}
@@ -126,3 +126,8 @@ func GetAllDeployments() *upcxxv1alpha1types.UPCXXList {
 	return deploymentList
 }
 
+func DeleteDeployment(name string) error {
+	upcxxClient := createUpcxxClient()
+	upcxxClient.Delete(name)
+	return nil
+}

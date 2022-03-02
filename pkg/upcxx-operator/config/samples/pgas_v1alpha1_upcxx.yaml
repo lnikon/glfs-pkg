@@ -1,9 +1,9 @@
 apiVersion: pgas.github.com/v1alpha1
 kind: UPCXX
 metadata:
-  name: upcxx-sample
+  name: kube-upcxx-demo-4
 spec:
   # Add fields here
-  statefulSetName: z
-  workerCount: 3
+  statefulSetName: kube-upcxx-demo-4
+  workerCount: 4
   algorithm: kruskal

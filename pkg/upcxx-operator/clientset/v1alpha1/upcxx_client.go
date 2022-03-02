@@ -47,3 +47,17 @@ func (c *UPCXXClient) Create(upcxx *v1alpha1.UPCXX) (*v1alpha1.UPCXX, error) {
 
 	return &result, err
 }
+
+func (c *UPCXXClient) Delete(name string, options *metav1.DeleteOptions) (*v1alpha1.UPCXX, error) {
+	result := v1alpha1.UPCXX{}
+	err := c.restClient.
+		Delete().
+		Namespace("default").
+		Resource("upcxxes").
+		Name(name).
+		Body(options).
+		Do(context.TODO()).
+		Into(&result)
+
+	return &result, err
+}

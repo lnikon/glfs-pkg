@@ -103,6 +103,7 @@ type UPCXXReconciler struct {
 //+kubebuilder:rbac:groups=pgas.github.com,resources=upcxxes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=pgas.github.com,resources=upcxxes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=pgas.github.com,resources=upcxxes/finalizers,verbs=update
+//+kubebuilder:rbac:groups=*,resources=upcxxes,verbs=get;list;watch;create;update;
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -225,8 +226,6 @@ func buildLauncherJob(upcxx *pgasv1alpha1.UPCXX) *batch.Job {
 			OwnerReferences: []meta.OwnerReference{controllerRef},
 		},
 		Spec: batch.JobSpec{
-			// TTLSecondsAfterFinished: mpiJob.Spec.RunPolicy.TTLSecondsAfterFinished,
-			// ActiveDeadlineSeconds:   mpiJob.Spec.RunPolicy.ActiveDeadlineSeconds,
 			BackoffLimit: int32ToPtr(1),
 			Template: core.PodTemplateSpec{
 				ObjectMeta: meta.ObjectMeta{
@@ -242,11 +241,9 @@ func buildLauncherJob(upcxx *pgasv1alpha1.UPCXX) *batch.Job {
 							Name:            UPCXXContainerName,
 							Image:           UPCXXLatestContainerName,
 							ImagePullPolicy: "Never",
-							Command:         []string{"sleep", "infinity"},
+							Env:             createEnvVars(upcxx),
 							Ports: []core.ContainerPort{
 								{
-									// Name:          buildLauncherJobName(upcxx),
-									// Name:          buildLauncherJobName(upcxx),
 									ContainerPort: 80,
 								},
 							},
@@ -258,7 +255,7 @@ func buildLauncherJob(upcxx *pgasv1alpha1.UPCXX) *batch.Job {
 		},
 	}
 
-	launcherJobSpec.Spec.Template.Spec.Containers[0].Env = append(launcherJobSpec.Spec.Template.Spec.Containers[0].Env, createEnvVars(upcxx)...)
+	//launcherJobSpec.Spec.Template.Spec.Containers[0].Env = append(launcherJobSpec.Spec.Template.Spec.Containers[0].Env, createEnvVars(upcxx)...)
 	setupSSHOnPod(&launcherJobSpec.Spec.Template.Spec, upcxx)
 
 	return launcherJobSpec
@@ -308,10 +305,8 @@ func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 							Name:            UPCXXContainerName,
 							Image:           UPCXXLatestContainerName,
 							ImagePullPolicy: "Never",
-							//Command:         []string{"sleep", "infinity"},
 							Ports: []core.ContainerPort{
 								{
-									// Name:          buildWorkerPodName(upcxx),
 									ContainerPort: 80,
 								},
 							},
@@ -320,10 +315,6 @@ func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 									Name:      upcxx.Spec.StatefulSetName + "-vm",
 									MountPath: "/vmount",
 								},
-								//{
-								//	Name:      "empty-dir-vm",
-								//	MountPath: rootSSHPath,
-								//},
 							},
 							SecurityContext: &core.SecurityContext{
 								RunAsUser:              int64ToPtr(1000),

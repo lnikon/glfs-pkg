@@ -24,6 +24,7 @@ type ComputationServiceIfc interface {
 	GetComputation(name string) (*Computation, error)
 	GetAllComputations() []Computation
 	PostComputation(algorithm glconstants.Algorithm) (*Computation, error)
+	DeleteComputation(name string) error
 }
 
 type ComputationService struct {
@@ -91,4 +92,8 @@ func (c *ComputationService) PostComputation(algorithm glconstants.Algorithm) (*
 
 	c.computations = append(c.computations, computation)
 	return &computation, nil
+}
+
+func (c *ComputationService) DeleteComputation(name string) error {
+	return glkube.CreateUPCXX(name)
 }

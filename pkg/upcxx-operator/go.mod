@@ -15,7 +15,7 @@ require (
 	sigs.k8s.io/controller-runtime v0.10.2
 )
 
-replace github.com/lnikon/glfs-pkg/pkg/constants => ../constants
+//replace github.com/lnikon/glfs-pkg/pkg/constants => ../constants
 
 require (
 	cloud.google.com/go v0.65.0 // indirect
