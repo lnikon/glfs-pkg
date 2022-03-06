@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	log "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	pgasv1alpha1 "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
 
@@ -43,26 +43,21 @@ import (
 	"strings"
 )
 
+// Container that contains UPCXX graphs library and application
 const (
-	// Container that contains UPCXX graphs library and application
 	UPCXXContainerName       = "pgasgraph"
-	UPCXXContainerTagLatest  = ":v0.1"
+	UPCXXContainerTagLatest  = ":latest"
 	UPCXXLatestContainerName = UPCXXContainerName + UPCXXContainerTagLatest
 
 	// Launcher specific definitions
-	launcherSuffix        = "-launcher"
-	launcherJobSuffix     = "-launcher-job"
-	launcherServiceSuffix = "-launcher-service"
+	launcherSuffix = "-launcher"
 
 	// Worker specific definitions
-	workerSuffix        = "-worker"
-	workerServiceSuffix = "-worker-service"
+	workerSuffix = "-worker"
 
 	// SSH
 	sshAuthSecretSuffix   = "-ssh"
 	sshAuthVolume         = "ssh-auth"
-	rootSSHPath           = "/home/upcxx/.ssh"
-	originalSSHPath       = "ssh"
 	sshPublicKey          = "ssh-publickey"
 	sshPrivateKeyFile     = "id_rsa"
 	sshPublicKeyFile      = sshPrivateKeyFile + ".pub"
@@ -104,6 +99,11 @@ type UPCXXReconciler struct {
 //+kubebuilder:rbac:groups=pgas.github.com,resources=upcxxes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=pgas.github.com,resources=upcxxes/finalizers,verbs=update
 //+kubebuilder:rbac:groups=*,resources=upcxxes,verbs=get;list;watch;create;update;
+//+kubebuilder:rbac:groups=*,resources=configmaps,verbs=get;list;watch;create;update;
+//+kubebuilder:rbac:groups=*,resources=services,verbs=get;list;watch;create;update;
+//+kubebuilder:rbac:groups=*,resources=events,verbs=get;list;watch;create;update;
+//+kubebuilder:rbac:groups=*,resources=statefulsets,verbs=get;list;watch;create;update;
+//+kubebuilder:rbac:groups=*,resources=jobs,verbs=get;list;watch;create;update;
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -115,7 +115,7 @@ type UPCXXReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.2/pkg/reconcile
 func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-	log := r.Log.WithValues("UPCXX", req.NamespacedName)
+	logger := r.Log.WithValues("UPCXX", req.NamespacedName)
 
 	upcxx := pgasv1alpha1.UPCXX{}
 	if err := r.Client.Get(ctx, req.NamespacedName, &upcxx); err != nil {
@@ -125,17 +125,17 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 
 	if _, err := r.getOrCreateSSHAuthSecret(&upcxx); err != nil {
-		log.Error(err, "creating SSH auth secret")
+		logger.Error(err, "creating SSH auth secret")
 	}
 
 	launcherService := &core.Service{}
 	err := r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: buildLauncherJobName(&upcxx)}, launcherService)
 	if apierrors.IsNotFound(err) {
-		log.Info("Could not find existing Service for launcher Job")
+		logger.Info("Could not find existing Service for launcher Job")
 
 		launcherService = buildLauncherService(&upcxx)
 		if err := r.Client.Create(ctx, launcherService); err != nil {
-			log.Error(err, "Unable to create Service for Launcher Job")
+			logger.Error(err, "Unable to create Service for Launcher Job")
 			return ctrl.Result{}, err
 		}
 
@@ -145,26 +145,26 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	workerService := &core.Service{}
 	err = r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: buildWorkerPodName(&upcxx)}, workerService)
 	if apierrors.IsNotFound(err) {
-		log.Info("Could not find existing Service for launcher Job")
+		logger.Info("Could not find existing Service for launcher Job")
 
 		workerService = buildWorkerService(&upcxx)
 		if err := r.Client.Create(ctx, workerService); err != nil {
-			log.Error(err, "Unable to create Service for Launcher Job")
+			logger.Error(err, "Unable to create Service for Launcher Job")
 			return ctrl.Result{}, err
 		}
 
 		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created Service for worker StatefulSet", buildWorkerPodName(&upcxx))
 	}
 
-	log = log.WithValues("StatefulSetName", upcxx.Spec.StatefulSetName)
+	logger = logger.WithValues("StatefulSetName", upcxx.Spec.StatefulSetName)
 	statefulSet := &apps.StatefulSet{}
 	err = r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: buildWorkerPodName(&upcxx)}, statefulSet)
 	if apierrors.IsNotFound(err) {
-		log.Info("Could not find existing StatefulSet for", "resource", buildWorkerPodName(&upcxx))
+		logger.Info("Could not find existing StatefulSet for", "resource", buildWorkerPodName(&upcxx))
 		statefulSet = buildWorkerStatefulSet(&upcxx)
 
 		if err := r.Client.Create(ctx, statefulSet); err != nil {
-			log.Error(err, "Failed to create StatefulSet", "resource", buildWorkerPodName(&upcxx))
+			logger.Error(err, "Failed to create StatefulSet", "resource", buildWorkerPodName(&upcxx))
 			return ctrl.Result{}, err
 		}
 
@@ -174,43 +174,21 @@ func (r *UPCXXReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	launcherJob := &batch.Job{}
 	err = r.Client.Get(ctx, client.ObjectKey{Namespace: upcxx.Namespace, Name: buildLauncherJobName(&upcxx)}, launcherJob)
 	if apierrors.IsNotFound(err) {
-		log.Info("Could not find existing Job for launcher job")
+		logger.Info("Could not find existing Job for launcher job")
 
 		launcherJob = buildLauncherJob(&upcxx)
 		if err := r.Client.Create(ctx, launcherJob); err != nil {
-			log.Error(err, "Failed to create Job for launcher pod")
+			logger.Error(err, "Failed to create Job for launcher pod")
 			return ctrl.Result{}, err
 		}
 
 		r.Recorder.Eventf(&upcxx, core.EventTypeNormal, "Created Job for launcher", buildLauncherJobName(&upcxx))
 	}
 
-	// podList := &core.PodList{}
-	// err = r.List(ctx, podList, client.InNamespace(upcxx.Namespace), client.MatchingLabels{"ownerStatefulSet": upcxx.Spec.StatefulSetName})
-	// if err != nil {
-	// 	log.Error(err, "unable to get pod list for UPCXX resource")
-	// }
-
-	// expectedReplicas := upcxx.Spec.WorkerCount
-	// if expectedReplicas != *statefulSet.Spec.Replicas {
-	// 	log.Info("Updating replica count forDeployment of", "resource", upcxx.Spec.StatefulSetName)
-	// 	statefulSet.Spec.Replicas = &expectedReplicas
-	// 	if err := r.Client.Update(ctx, statefulSet); err != nil {
-	// 		log.Error(err, "Failed to update", "old_replica_count", statefulSet.Spec.Replicas, "new_replica_count", expectedReplicas, "resource", upcxx.Spec.StatefulSetName)
-	// 		return ctrl.Result{}, err
-	// 	}
-
-	// 	log.Info("Successfuly updated replica count for", "resource", upcxx.Spec.StatefulSetName)
-	// }
-
 	return ctrl.Result{}, nil
 }
 
 func buildLauncherJobName(upcxx *pgasv1alpha1.UPCXX) string {
-	return upcxx.Spec.StatefulSetName + launcherSuffix
-}
-
-func buildLauncherPodName(upcxx *pgasv1alpha1.UPCXX) string {
 	return upcxx.Spec.StatefulSetName + launcherSuffix
 }
 
@@ -232,6 +210,7 @@ func buildLauncherJob(upcxx *pgasv1alpha1.UPCXX) *batch.Job {
 					Name: buildLauncherJobName(upcxx),
 					Labels: map[string]string{
 						"app": buildLauncherJobName(upcxx),
+						"hpc": "upcxx",
 					},
 				},
 				Spec: core.PodSpec{
@@ -288,6 +267,7 @@ func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 					Name: buildWorkerPodName(upcxx),
 					Labels: map[string]string{
 						"app": buildWorkerPodName(upcxx),
+						"hpc": "upcxx",
 					},
 				},
 				Spec: core.PodSpec{
@@ -354,7 +334,7 @@ func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 }
 
 func createSSHServersEnv(upcxx *pgasv1alpha1.UPCXX) (core.EnvVar, []string) {
-	sshServersList := []string{}
+	var sshServersList []string
 	sshServersList = append(sshServersList, buildLauncherJobName(upcxx))
 	workerName := buildWorkerPodName(upcxx)
 	for idx := int32(0); idx < upcxx.Spec.WorkerCount-1; idx++ {
@@ -486,7 +466,7 @@ func newSSHAuthSecret(job *pgasv1alpha1.UPCXX) (*core.ConfigMap, error) {
 		BinaryData: map[string][]byte{
 			core.SSHAuthPrivateKey: privatePEM,
 			sshPublicKey:           ssh.MarshalAuthorizedKey(publicKey),
-			sshKnownHosts:          []byte{},
+			sshKnownHosts:          {},
 		},
 	}, nil
 }
