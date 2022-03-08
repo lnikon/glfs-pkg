@@ -25,6 +25,9 @@ func (mw LoggingMiddleware) GetComputation(name string) (computation *Computatio
 	}(time.Now())
 
 	computation, err = mw.Next.GetComputation(name)
+	if err != nil {
+		mw.Logger.Log("Error: ", err.Error())
+	}
 	return
 }
 
@@ -52,5 +55,24 @@ func (mw LoggingMiddleware) PostComputation(algorithm glconstants.Algorithm) (ou
 	}(time.Now())
 
 	output, err = mw.Next.PostComputation(algorithm)
+	if err != nil {
+		mw.Logger.Log("Error: ", err.Error())
+	}
+	return
+}
+
+func (mw LoggingMiddleware) DeleteComputation(name string) (err error) {
+	defer func(begin time.Time) {
+		mw.Logger.Log(
+			"method", "DeleteComputation",
+			"input", fmt.Sprintf("%v", name),
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+
+	err = mw.Next.DeleteComputation(name)
+	if err != nil {
+		mw.Logger.Log("Error: ", err.Error())
+	}
 	return
 }
