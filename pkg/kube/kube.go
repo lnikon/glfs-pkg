@@ -2,16 +2,15 @@ package kube
 
 import (
 	"flag"
-	"k8s.io/client-go/tools/clientcmd"
 	"log"
 	"path/filepath"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/homedir"
 
 	glconst "github.com/lnikon/glfs-pkg/pkg/constants"
 	upcxxv1alpha1types "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/api/v1alpha1"
 	upcxxv1alpha1clientset "github.com/lnikon/glfs-pkg/pkg/upcxx-operator/clientset/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/homedir"
+	ctrl "sigs.k8s.io/controller-runtime"
 	// meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	// apiextensions "k8s.io/apiextensions-apiserver"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,11 +30,12 @@ func init() {
 func createUpcxxClient() upcxxv1alpha1clientset.UPCXXInterface {
 	flag.Parse()
 
-	kubeconfig := flag.Lookup("kubeconfig")
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig.Value.String())
-	if err != nil {
-		log.Fatal(err.Error())
-	}
+	//kubeconfig := flag.Lookup("kubeconfig")
+	//config, err := clientcmd.BuildConfigFromFlags("", kubeconfig.Value.String())
+	config := ctrl.GetConfigOrDie()
+	//if err != nil {
+	//	log.Fatal(err.Error())
+	//}
 
 	clientset, err := upcxxv1alpha1clientset.NewForConfig(config)
 	if err != nil {
