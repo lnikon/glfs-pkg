@@ -29,15 +29,10 @@ func init() {
 }
 
 func createUpcxxClient() upcxxv1alpha1clientset.UPCXXInterface {
-	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")
-	}
 	flag.Parse()
 
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	kubeconfig := flag.Lookup("kubeconfig")
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig.Value.String())
 	if err != nil {
 		log.Fatal(err.Error())
 	}
