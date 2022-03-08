@@ -1,13 +1,11 @@
 package kube
 
 import (
-	"context"
 	"flag"
 	"log"
 	"path/filepath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
@@ -46,32 +44,33 @@ func createUpcxxClient() upcxxv1alpha1clientset.UPCXXInterface {
 	return clientset.UPCXX("default")
 }
 
-func GetPodsCount() int {
-	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")
-	}
-	flag.Parse()
-
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	return len(pods.Items)
-}
+// TODO: Review
+//func GetPodsCount() int {
+//	var kubeconfig *string
+//	if home := homedir.HomeDir(); home != "" {
+//		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "")
+//	} else {
+//		kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")
+//	}
+//	flag.Parse()
+//
+//	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+//	if err != nil {
+//		log.Fatal(err.Error())
+//	}
+//
+//	clientset, err := kubernetes.NewForConfig(config)
+//	if err != nil {
+//		log.Fatal(err.Error())
+//	}
+//
+//	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+//	if err != nil {
+//		log.Fatal(err.Error())
+//	}
+//
+//	return len(pods.Items)
+//}
 
 func CreateUPCXX(name string) error {
 	upcxxClient := createUpcxxClient()
@@ -128,6 +127,10 @@ func GetAllDeployments() *upcxxv1alpha1types.UPCXXList {
 
 func DeleteDeployment(name string) error {
 	upcxxClient := createUpcxxClient()
-	upcxxClient.Delete(name)
+	// TODO: Test this
+	_, err := upcxxClient.Delete(name, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
 	return nil
 }

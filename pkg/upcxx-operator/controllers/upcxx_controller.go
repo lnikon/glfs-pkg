@@ -282,8 +282,9 @@ func buildWorkerStatefulSet(upcxx *pgasv1alpha1.UPCXX) *apps.StatefulSet {
 					},
 					Containers: []core.Container{
 						{
-							Name:            UPCXXContainerName,
-							Image:           UPCXXLatestContainerName,
+							Name:  UPCXXContainerName,
+							Image: UPCXXLatestContainerName,
+							// TODO: Pass using UPCXX resource. Set default to IfNotPresent.
 							ImagePullPolicy: "Never",
 							Ports: []core.ContainerPort{
 								{
@@ -395,7 +396,6 @@ func newService(upcxx *pgasv1alpha1.UPCXX, name string) *core.Service {
 		Spec: core.ServiceSpec{
 			Ports: []core.ServicePort{
 				{
-					// Name: name,
 					Port: 80,
 				},
 			},
