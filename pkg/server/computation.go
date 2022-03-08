@@ -95,5 +95,6 @@ func (c *ComputationService) PostComputation(algorithm glconstants.Algorithm) (*
 }
 
 func (c *ComputationService) DeleteComputation(name string) error {
-	return glkube.CreateUPCXX(name)
+	//return glkube.CreateUPCXX(name)
+	return nil
 }
