@@ -2,11 +2,11 @@ package kube
 
 import (
 	"flag"
+	"k8s.io/client-go/tools/clientcmd"
 	"log"
 	"path/filepath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
 	glconst "github.com/lnikon/glfs-pkg/pkg/constants"
@@ -29,16 +29,22 @@ func init() {
 }
 
 func createUpcxxClient() upcxxv1alpha1clientset.UPCXXInterface {
+	var kubeconfig *string
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")
+	}
 	flag.Parse()
-	kubeconfig := flag.Lookup("kubeconfig").Value.(flag.Getter).Get().(string)
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil || config == nil {
-		log.Fatal(err)
+
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		log.Fatal(err.Error())
 	}
 
 	clientset, err := upcxxv1alpha1clientset.NewForConfig(config)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	return clientset.UPCXX("default")
