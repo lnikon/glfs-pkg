@@ -130,8 +130,5 @@ func DeleteDeployment(name string) error {
 	upcxxClient := createUpcxxClient()
 	// TODO: Test this
 	_, err := upcxxClient.Delete(name, &metav1.DeleteOptions{})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
